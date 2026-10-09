@@ -194,6 +194,7 @@ input[type=checkbox]{accent-color:var(--accent);width:22px;height:22px}
       <div class="panel" data-p="ar" hidden>
         <div class="sec"><div class="lab">へやの なかに キャラを だす</div>
           <button class="btn pri" id="arCam">カメラで AR</button>
+          <button class="btn" id="arMotion" hidden>スマホを うごかして みまわす</button>
           <div class="big two"><button class="btn" id="arPhoto">しゃしんで ためす</button><button class="btn" id="arOff">もどす</button></div>
           <input type="file" id="arFile" accept="image/*" hidden>
           <label class="kv"><input type="checkbox" id="arGyro" checked> スマホを うごかして みまわす</label>
@@ -844,7 +845,7 @@ const IN_FRAME=(()=>{try{return window.self!==window.top;}catch(e){return true;}
 const AR={on:false,gyro:false,q:null,stream:null,alpha0:null,
   setMode(on){this.on=on;mat.visible=!on;matEdge.visible=!on;shadowPlane.visible=on;scene.background=on?null:BGC;scene.fog=on?null:new THREE.Fog(BGC,9,20);renderer.setClearColor(0x000000,on?0:1);},
   askMotion(){try{if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function')return DeviceOrientationEvent.requestPermission().then(r=>r==='granted').catch(()=>false);}catch(e){return Promise.resolve(false);}return Promise.resolve(typeof DeviceOrientationEvent!=='undefined');},
-  async camera(){const st=$('#arStatus');const motionP=$('#arGyro').checked?this.askMotion():Promise.resolve(false);
+  async camera(){const st=$('#arStatus');
     const noCam=()=>{st.innerHTML=IN_FRAME?'<b>この ページでは カメラが つかえないよ。</b><br>「しゃしんで ためす」で あそんでね。<br><span class="adult">カメラ AR は、配布している HTML ファイルを https のサイト(GitHub Pages など)に置いて開くと使えます。</span>':'<b>この ブラウザでは カメラが つかえないよ。</b><br>「しゃしんで ためす」で あそんでね。<br><span class="adult">https のページで開いているか確認してください。</span>';};
     if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){noCam();return;}
     st.textContent='カメラを じゅんびちゅう…';
@@ -852,7 +853,8 @@ const AR={on:false,gyro:false,q:null,stream:null,alpha0:null,
     catch(e){if(!IN_FRAME&&e&&e.name==='NotAllowedError')st.innerHTML='<b>カメラが ゆるされなかったよ。</b><br>ブラウザの せっていで カメラを ゆるすと つかえるよ。';else noCam();return;}
     this.off(true);this.stream=s;const v=$('#bgv');v.srcObject=s;v.hidden=false;try{await v.play();}catch(e){}
     this.setMode(true);orbit.phi=1.0;orbit.r=4.6;st.innerHTML='<b>カメラ AR ちゅう</b>';
-    if(await motionP)this.listenGyro();
+    this.needMotionTap=typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function';
+    if($('#arGyro').checked){if(this.needMotionTap){$('#arMotion').hidden=false;st.innerHTML='<b>カメラ AR ちゅう</b><br>スマホを うごかして みまわすには、したの ボタンを おしてね。';}else this.listenGyro();}
     showTourAR();},
   listenGyro(){const zee=V3(0,0,1),eu=new THREE.Euler(),q0=new THREE.Quaternion(),q1=new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));this.alpha0=null;
     if(this._h)window.removeEventListener('deviceorientation',this._h);
@@ -863,7 +865,7 @@ const AR={on:false,gyro:false,q:null,stream:null,alpha0:null,
   recenter(){this.alpha0=null;},
   photo(file){if(!file)return;this.off(true);const img=$('#bgi');if(img.src&&img.src.startsWith('blob:'))URL.revokeObjectURL(img.src);img.src=URL.createObjectURL(file);img.hidden=false;this.setMode(true);orbit.phi=1.0;
     $('#arStatus').innerHTML='<b>しゃしんの うえに だしたよ。</b><br>なにも ない ところを ゆびで うごかして、ゆかの むきに あわせてね。<br>しゃしんは どこにも おくらないよ。';},
-  off(keep){if(this.stream){this.stream.getTracks().forEach(t=>t.stop());this.stream=null;}const v=$('#bgv');v.srcObject=null;this.stopGyro();
+  off(keep){$('#arMotion').hidden=true;if(this.stream){this.stream.getTracks().forEach(t=>t.stop());this.stream=null;}const v=$('#bgv');v.srcObject=null;this.stopGyro();
     v.hidden=true;$('#bgi').hidden=true;if(!keep){this.setMode(false);$('#arStatus').textContent='';}}
 };
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&AR.stream){AR.off();$('#arStatus').innerHTML='<b>カメラを とめたよ。</b> もういちど つかう ときは「カメラで AR」を おしてね。';Object.assign(orbit,ORBIT0,{target:ORBIT0.target.clone()});}});
@@ -992,6 +994,7 @@ renderWalker();
 // AR
 $('#arCam').onclick=()=>AR.camera();$('#arPhoto').onclick=()=>$('#arFile').click();$('#arFile').onchange=e=>{AR.photo(e.target.files[0]);e.target.value='';};
 $('#arOff').onclick=()=>{AR.off();Object.assign(orbit,ORBIT0,{target:ORBIT0.target.clone()});};
+$('#arMotion').onclick=()=>{AR.askMotion().then(ok=>{if(ok){AR.listenGyro();$('#arMotion').hidden=true;$('#arStatus').innerHTML='<b>カメラ AR ちゅう</b>';}else{$('#arStatus').innerHTML='<b>うごきの センサーが ゆるされなかったよ。</b><br>ゆびで なにも ない ところを うごかしても みまわせるよ。';}});};
 $('#arGyro').onchange=e=>{if(!AR.stream)return;if(e.target.checked){AR.askMotion().then(ok=>{if(ok)AR.listenGyro();});}else AR.stopGyro();};
 
 // タブ
